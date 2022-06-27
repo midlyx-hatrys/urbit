@@ -8870,8 +8870,8 @@
           %dbug  $(skin skin.skin)
           %help  $(skin skin.skin)
           %name  $(skin skin.skin)
-          %over  $(skin skin.skin)
-          %spec  $(skin skin.skin)
+          %over  $(skin skin.skin)  ::TODO  can't be right..?
+          %spec  q:(~(mint ut ref) %noun [%fits ~(example ax spec.skin) [&+1 ~]])
           %wash  [%1 1]
       ==
     ::
@@ -8879,7 +8879,7 @@
     ::
     ++  gain
       |-  ^-  type
-      ?@  skin  [%face skin ref]
+      ?@  skin  gain(skin spec+[[%like [skin]~ ~] [%base %noun]])
       ?-    -.skin
       ::
           %base
@@ -8902,7 +8902,7 @@
                        q.ref
             [%cell *]  %void
             [%core *]  %void
-            [%face *]  (face p.ref $(ref q.ref))
+            [%face *]  (face p.ref $(ref q.ref))  ::TODO  consider deleting here and in other cases
             [%fork *]  (fork (turn ~(tap in p.ref) |=(=type ^$(ref type))))
             [%hint *]  (hint p.ref $(ref q.ref))
             [%hold *]  ?:  (~(has in gil) ref)  %void
@@ -8973,7 +8973,7 @@
     ::
     ++  lose
       |-  ^-  type
-      ?@  skin  [%face skin ref]
+      ?@  skin  gain(skin spec+[[%like [skin]~ ~] [%base %noun]])
       ?-    -.skin
       ::
           %base
@@ -9734,6 +9734,17 @@
     |=  gen=hoon  ^-  type
     (chip | gen)
   ::
+  ++  wipe
+    |=  mud=type
+    ?+  mud  mud
+      [%cell *]  mud(p $(mud p.mud), q $(mud q.mud))
+      [%core *]  mud(p $(mud p.mud))
+      [%face *]  $(mud q.mud)
+      [%fork *]  mud(p (~(run in p.mud) wipe))
+      [%hint *]  mud(p.p $(mud p.p.mud), q $(mud q.mud))
+      [%hold *]  mud(p $(mud p.mud))
+    ==
+  ::
   ++  chip
     ~/  %chip
     |=  [how=? gen=hoon]  ^-  type
@@ -9745,7 +9756,9 @@
         %|  sut
         %&  =<  q
             %+  take  p.p.fid
-            |=(a=type ?:(how ~(gain ar a p.gen) ~(lose ar a p.gen)))
+            |=  a=type
+            =.  a  (wipe a)
+            ?:(how ~(gain ar a p.gen) ~(lose ar a p.gen))
       ==
     ?:  ?&(how ?=([%wtpm *] gen))
       |-(?~(p.gen sut $(p.gen t.p.gen, sut ^$(gen i.p.gen))))
