@@ -56,6 +56,16 @@
 #     define c3_max(x, y) ( ((x) > (y)) ? (x) : (y) )
 #     define c3_min(x, y) ( ((x) < (y)) ? (x) : (y) )
 
+
+//! Round [x] up to the nearest multiple of [n], where [n] must be a power of 2.
+#define c3_round_up(x, n) (((x) + ((n) - 1)) & (~((n) - 1)))
+
+
+//! Round [x] down to the nearest multiple of [n], where [n] must be a power of
+//! 2.
+#define c3_round_down(x, n) ((x) & ~((n) - 1))
+
+
     /* Rotate.
     */
 #     define c3_rotw(r, x)  ( ((x) << (r)) | ((x) >> (32 - (r))) )
