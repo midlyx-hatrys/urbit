@@ -90,6 +90,9 @@ static const size_t pag_siz_i = 1 << (u3a_page + 2);
 //! Urbit page size in 4-byte words.
 static const size_t pag_wiz_i = 1 << u3a_page;
 
+//! Base address of the guard page.
+static u3p(c3_w) guard_base_p;
+
 #ifdef U3_SNAPSHOT_VALIDATION
 /* Image check.
 */
@@ -188,9 +191,48 @@ _ce_mapfree(void* map_v)
 }
 #endif
 
+static void
+_center_guard_page(void)
+{
+  // XXX: I think u3p is a word offset, not a byte offset, but I'm not sure.
+  u3p(c3_w) bottom_p, top_p;
+  if ( c3y == u3a_is_north(u3R) ) {
+    bottom_p = c3_round_up(u3R->hat_p, pag_wiz_i);
+    top_p    = c3_round_down(u3R->cap_p, pag_wiz_i);
+  }
+  else {
+    bottom_p = c3_round_up(u3R->cap_p, pag_wiz_i);
+    top_p    = c3_round_down(u3R->hat_p, pag_wiz_i);
+  }
+
+  if ( top_p <= bottom_p ) {
+    fprintf(stderr, "loom: not enough memory to recenter the guard page\r\n");
+    goto fail;
+  }
+
+  guard_base_p = bottom_p + (c3_w)(top_p - bottom_p) / 2;
+
+  if ( -1 == mprotect(u3a_into(guard_base_p), pag_siz_i, PROT_NONE) ) {
+    fprintf(stderr, "loom: failed to protect the guard page\r\n");
+    goto fail;
+  }
+
+  fprintf(stderr, "loom: placed guard page at %p\r\n", u3a_into(guard_base_p));
+
+  return;
+
+fail:
+  u3m_bail(c3__meme);
+}
+
 c3_i
 u3e_fault(void* adr_v, c3_i ser_i)
 {
+  // Set up the guard page the first time the handler runs.
+  if ( 0 == guard_base_p ) {
+    _center_guard_page();
+  }
+
   // Let the stack overflow handler run.
   if ( 0 == ser_i ) {
     return 0;
@@ -208,8 +250,14 @@ u3e_fault(void* adr_v, c3_i ser_i)
     return 0;
   }
   else {
-    c3_w off_w = u3a_outa(adr_w);
-    c3_w pag_w = off_w >> u3a_page;
+    // We attempted to access the guard page. Relocate it and mark the old
+    // location (that we just tried to access) as accessible.
+    u3p(c3_w) adr_p = u3a_outa(adr_w);
+    if ( guard_base_p <= adr_p && adr_p < guard_base_p + pag_wiz_i ) {
+      _center_guard_page();
+    }
+
+    c3_w pag_w = adr_p >> u3a_page;
     c3_w blk_w = (pag_w >> 5);
     c3_w bit_w = (pag_w & 31);
 
@@ -228,7 +276,7 @@ u3e_fault(void* adr_v, c3_i ser_i)
               "strange page: %d, at %p, off %x\r\n",
               pag_w,
               adr_w,
-              off_w);
+              adr_p);
       c3_assert(0);
       return 0;
     }
@@ -245,6 +293,7 @@ u3e_fault(void* adr_v, c3_i ser_i)
       return 0;
     }
   }
+
   return 1;
 }
 
@@ -1048,6 +1097,7 @@ u3e_live(const c3_c* dir_c)
       }
     }
   }
+
   return nuu_o;
 }
 
