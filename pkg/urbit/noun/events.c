@@ -205,12 +205,13 @@ _center_guard_page(void)
     top_p    = c3_round_down(u3R->hat_p, pag_wiz_i);
   }
 
-  if ( top_p <= bottom_p ) {
+  if ( top_p < bottom_p + pag_wiz_i ) {
     fprintf(stderr, "loom: not enough memory to recenter the guard page\r\n");
     goto fail;
   }
 
-  guard_base_p = bottom_p + (c3_w)(top_p - bottom_p) / 2;
+  guard_base_p = bottom_p
+    + c3_round_down((c3_w)(top_p - bottom_p) / 2, pag_wiz_i);
 
   if ( -1 == mprotect(u3a_into(guard_base_p), pag_siz_i, PROT_NONE) ) {
     fprintf(stderr, "loom: failed to protect the guard page\r\n");
@@ -250,28 +251,17 @@ u3e_fault(void* adr_v, c3_i ser_i)
     return 0;
   }
   else {
+    u3p(c3_w) adr_p = u3a_outa(adr_w);
+    c3_w      pag_w = adr_p >> u3a_page;
+    c3_w      blk_w = (pag_w >> 5);
+    c3_w      bit_w = (pag_w & 31);
+
     // We attempted to access the guard page. Relocate it and mark the old
     // location (that we just tried to access) as accessible.
-    u3p(c3_w) adr_p = u3a_outa(adr_w);
     if ( guard_base_p <= adr_p && adr_p < guard_base_p + pag_wiz_i ) {
       _center_guard_page();
     }
-
-    c3_w pag_w = adr_p >> u3a_page;
-    c3_w blk_w = (pag_w >> 5);
-    c3_w bit_w = (pag_w & 31);
-
-#if 0
-    if ( pag_w == 131041 ) {
-      u3l_log("dirty page %d (at %p); unprotecting %p to %p\r\n",
-              pag_w,
-              adr_v,
-              (u3_Loom + (pag_w << u3a_page)),
-              (u3_Loom + (pag_w << u3a_page) + pag_wiz_i));
-    }
-#endif
-
-    if ( 0 != (u3P.dit_w[blk_w] & (1 << bit_w)) ) {
+    else if ( 0 != (u3P.dit_w[blk_w] & (1 << bit_w)) ) {
       fprintf(stderr,
               "strange page: %d, at %p, off %x\r\n",
               pag_w,
@@ -280,8 +270,9 @@ u3e_fault(void* adr_v, c3_i ser_i)
       c3_assert(0);
       return 0;
     }
-
-    u3P.dit_w[blk_w] |= (1 << bit_w);
+    else {
+      u3P.dit_w[blk_w] |= (1 << bit_w);
+    }
 
     if ( -1
          == mprotect((void*)(u3_Loom + (pag_w << u3a_page)),
