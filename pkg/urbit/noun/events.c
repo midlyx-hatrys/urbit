@@ -210,15 +210,22 @@ _center_guard_page(void)
     goto fail;
   }
 
+  // XXX: It should be impossible to place the guard page in the same location
+  // twice in a row.
+  const u3p(c3_w) prev_base_p = guard_base_p;
   guard_base_p = bottom_p
     + c3_round_down((c3_w)(top_p - bottom_p) / 2, pag_wiz_i);
+  if ( prev_base_p == guard_base_p ) {
+    fprintf(stderr, "loom: not enough memory to recenter the guard page\r\n");
+    goto fail;
+  }
 
   if ( -1 == mprotect(u3a_into(guard_base_p), pag_siz_i, PROT_NONE) ) {
     fprintf(stderr, "loom: failed to protect the guard page\r\n");
     goto fail;
   }
 
-  fprintf(stderr, "loom: placed guard page at %p\r\n", u3a_into(guard_base_p));
+  //fprintf(stderr, "loom: placed guard page at %p\r\n", u3a_into(guard_base_p));
 
   return;
 
