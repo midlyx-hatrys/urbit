@@ -210,13 +210,21 @@ _center_guard_page(void)
     goto fail;
   }
 
+  fprintf(stderr,
+          "debug: bottom=%p, top=%p\r\n",
+          u3a_into(bottom_p),
+          u3a_into(top_p));
+
   // XXX: It should be impossible to place the guard page in the same location
   // twice in a row.
   const u3p(c3_w) prev_base_p = guard_base_p;
   guard_base_p = bottom_p
     + c3_round_down((c3_w)(top_p - bottom_p) / 2, pag_wiz_i);
   if ( prev_base_p == guard_base_p ) {
-    fprintf(stderr, "loom: not enough memory to recenter the guard page\r\n");
+    fprintf(stderr,
+            "loom: not enough memory to recenter the guard page "
+            "(only 0x%xB free)\r\n",
+            (c3_w)(u3a_into(top_p) - u3a_into(bottom_p)));
     goto fail;
   }
 
@@ -266,6 +274,9 @@ u3e_fault(void* adr_v, c3_i ser_i)
     // We attempted to access the guard page. Relocate it and mark the old
     // location (that we just tried to access) as accessible.
     if ( guard_base_p <= adr_p && adr_p < guard_base_p + pag_wiz_i ) {
+      fprintf(stderr, "\r\n");
+      fprintf(stderr, "debug: guard_base_v=%p\r\n", u3a_into(guard_base_p));
+      fprintf(stderr, "debug: adr_w=%p\r\n", adr_w);
       _center_guard_page();
     }
     else if ( 0 != (u3P.dit_w[blk_w] & (1 << bit_w)) ) {
